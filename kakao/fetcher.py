@@ -16,7 +16,8 @@ def save_json(data, subfolder_name, file_name, platform="kakao"):
     dir_path = os.path.dirname(file_path)
     if os.path.exists(dir_path):
         shutil.rmtree(dir_path)
-    os.makedirs(os.path.dirname(file_path))
+        
+    os.makedirs(dir_path)
 
     try:
         with open(file_path, "w", encoding="utf-8") as f:
