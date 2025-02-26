@@ -5,8 +5,6 @@ import requests
 from datetime import datetime
 from endpoint import KakaoWebtoonEndpoint
 
-DEFAULT_TOTAL_COUNT = 9999
-
 
 def save_json(data, subfolder_name, file_name, platform="kakao"):
     date_str = datetime.now().strftime("%Y/%m/%d")
@@ -77,7 +75,7 @@ def fetch_title_info(title_id):
         print(f"Error fetching title info for {title_id}: {e}")
 
 
-def fetch_episodes(title_id, total_count=DEFAULT_TOTAL_COUNT):
+def fetch_episodes(title_id, total_count=9999):
     episodes = []
     try:
         url = KakaoWebtoonEndpoint.EPISODE_LIST.value.format(title_id=title_id, total_count=total_count)
@@ -94,7 +92,7 @@ def fetch_episodes(title_id, total_count=DEFAULT_TOTAL_COUNT):
         return None
 
 
-def fetch_comments(title_id, episode_id, total_count=DEFAULT_TOTAL_COUNT):
+def fetch_comments(title_id, episode_id, total_count=10):
     try:
         url = KakaoWebtoonEndpoint.COMMENTS.value.format(episode_id=episode_id, total_count=total_count)
         fetch_json(url, "comments", os.path.join(str(title_id), str(episode_id)))
@@ -110,10 +108,10 @@ def fetch_episode_likes(title_id, episode_id):
         print(f"Error fetching episode likes for title {title_id} and episode {episode_id}: {e}")
 
 
-def fetch_data_for_titles(titles):
+def fetch_data_for_titles(titles, total_count=9999):
     for title in titles:
         fetch_title_info(title)
-        episodes = fetch_episodes(title)
+        episodes = fetch_episodes(title, total_count)
         
         for episode in episodes:
             fetch_comments(title, episode)
@@ -133,7 +131,7 @@ def fetch_all_historical_data():
 # Airflow Current Data DAG Call Function
 def fetch_daily_data(day):
     titles = fetch_titles(day)
-    fetch_data_for_titles(titles)
+    fetch_data_for_titles(titles, 10)
 
 
 # Main Call Function
