@@ -1,3 +1,4 @@
+import shutil
 import os
 import json
 import requests
@@ -12,7 +13,10 @@ def save_json(data, subfolder_name, file_name, platform="kakao"):
     output_folder = os.path.join("output", "raw", platform, subfolder_name, date_str)
 
     file_path = os.path.join(output_folder, f"{file_name}.json")
-    os.makedirs(os.path.dirname(file_path), exist_ok=True)
+    dir_path = os.path.dirname(file_path)
+    if os.path.exists(dir_path):
+        shutil.rmtree(dir_path)
+    os.makedirs(os.path.dirname(file_path))
 
     try:
         with open(file_path, "w", encoding="utf-8") as f:
@@ -104,11 +108,6 @@ def fetch_episode_likes(title_id, episode_id):
     except requests.RequestException as e:
         print(f"Error fetching episode likes for title {title_id} and episode {episode_id}: {e}")
 
-    try:
-        url = KakaoWebtoonEndpoint.EPISODE_LIKES.value.format(episode_id=episode_id, title_id=title_id)
-        fetch_json(url, "episode_likes", f"{title_id}\\{episode_id}")
-    except requests.RequestException as e:
-        print(f"Error fetching title info: {e}")
 
 def fetch_data_for_titles(titles):
     for title in titles:
