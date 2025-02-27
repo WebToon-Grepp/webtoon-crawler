@@ -324,7 +324,7 @@ def fetch_titles_daily(dayInt):
         }
 
         current_date = datetime.now().strftime('%Y/%m/%d')
-        file_path = f'output/raw/naver/titles/{current_date}/{day_name}.json'
+        file_path = f'output/raw/naver/titles/{current_date}/titles.json'
 
         os.makedirs(os.path.dirname(file_path), exist_ok=True)
 
