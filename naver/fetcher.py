@@ -379,6 +379,8 @@ def fetch_all_historical_data():
         fetch_episode_likes(title)
 
 def fetch_daily_data(dayInt):
+    clear_output_folder()
+    
     titles = fetch_titles_daily(dayInt)
 
     for title in titles:
