@@ -324,7 +324,7 @@ def fetch_titles_daily(dayInt):
         }
 
         current_date = datetime.now().strftime('%Y/%m/%d')
-        file_path = f'output/raw/naver/titles/{current_date}/{day_name}.json'
+        file_path = f'output/raw/naver/titles/{current_date}/titles.json'
 
         os.makedirs(os.path.dirname(file_path), exist_ok=True)
 
@@ -379,6 +379,8 @@ def fetch_all_historical_data():
         fetch_episode_likes(title)
 
 def fetch_daily_data(dayInt):
+    clear_output_folder()
+    
     titles = fetch_titles_daily(dayInt)
 
     for title in titles:
