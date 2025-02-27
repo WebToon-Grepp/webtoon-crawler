@@ -4,8 +4,16 @@ import requests
 from endpoint import NaverWebtoonEndpoint
 from datetime import datetime
 import time
+import shutil
 
 headers = NaverWebtoonEndpoint.HEADERS.value
+
+def clear_output_folder():
+    folder_path = 'output/raw/naver'
+    if os.path.exists(folder_path):
+        shutil.rmtree(folder_path)
+        print(f"{folder_path} 폴더 초기화 완료")
+    os.makedirs(folder_path, exist_ok=True)
 
 def fetch_titles():
     titles = []
@@ -340,6 +348,8 @@ def fetch_titles_daily(dayInt):
         return None
 
 def fetch_all_data():
+    clear_output_folder()
+
     titles = fetch_titles()
     finished_titles = fetch_finished_titles()
     
@@ -354,6 +364,8 @@ def fetch_all_data():
         print()
 
 def fetch_all_historical_data():
+    clear_output_folder()
+    
     titles = fetch_titles()
     finished_titles = fetch_finished_titles()
     
