@@ -62,7 +62,7 @@ def fetch_titles_from_url(url, subfolder_name, file_name):
 
 def fetch_titles(day):
     url = KakaoWebtoonEndpoint.TITLES.value[day]
-    return fetch_titles_from_url(url, "titles", "titles")
+    return fetch_titles_from_url(url, "titles", f"titles_{day}")
 
 
 def fetch_finished_titles():
@@ -137,12 +137,12 @@ def fetch_daily_data(day):
     clear_folder()
 
     titles = fetch_titles(day)
-    fetch_data_for_titles(titles, 10)
+    fetch_data_for_titles(titles, 3)
 
 
 # Main Call Function
 def fetch_all_data():
     clear_folder()
-    
+
     fetch_daily_data(0)
 
