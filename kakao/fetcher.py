@@ -137,7 +137,7 @@ def fetch_daily_data(day):
     clear_folder()
 
     titles = fetch_titles(day)
-    fetch_data_for_titles(titles, 10)
+    fetch_data_for_titles(titles, 3)
 
 
 # Main Call Function
