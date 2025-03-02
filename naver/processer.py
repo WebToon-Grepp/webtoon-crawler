@@ -122,7 +122,7 @@ def join_episodes(spark, episodes, comments, episode_likes):
         FROM joined_episodes
     """)
 
-    joined_episodes_df.show(50)
+    # joined_episodes_df.show(50)
     save_to_parquet(joined_episodes_df, "episodes")
 
 
@@ -145,14 +145,14 @@ def run():
                                        .withColumn("updated_date", to_date(col("timestamp")))
     comments_df = get_comments(spark, date_str)
 
-    backup_to_parquet(titles_df, "s3a://wt-grepp-lake/raw/temp/naver_titles_df")
-    backup_to_parquet(title_info_df, "s3a://wt-grepp-lake/raw/temp/naver_title_info_df")
-    backup_to_parquet(episodes_df, "s3a://wt-grepp-lake/raw/temp/naver_episodes_df")
-    backup_to_parquet(episode_likes_df, "s3a://wt-grepp-lake/raw/temp/naver_episode_likes_df")
-    backup_to_parquet(comments_df, "s3a://wt-grepp-lake/raw/temp/naver_comments_df")
+    backup_to_parquet(titles_df, "titles")
+    backup_to_parquet(title_info_df, "title_info")
+    backup_to_parquet(episodes_df, "episodes")
+    backup_to_parquet(episode_likes_df, "episode_likes")
+    backup_to_parquet(comments_df, "comments")
     
-    titles_df.show(50)
-    title_info_df.show(50)
+    # titles_df.show(50)
+    # title_info_df.show(50)
     save_to_parquet(titles_df, "titles")
     save_to_parquet(title_info_df, "genres")
 

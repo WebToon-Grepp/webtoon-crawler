@@ -109,8 +109,8 @@ def join_titles(spark, titles, title_info):
         SELECT platform, id AS title_id, genre_name FROM joined_titles
     """)
 
-    joined_titles_df.show(50)
-    joined_genres_df.show(50)
+    # joined_titles_df.show(50)
+    # joined_genres_df.show(50)
     save_to_parquet(joined_titles_df, "titles")
     save_to_parquet(joined_genres_df, "genres")
 
@@ -139,7 +139,7 @@ def join_episodes(spark, episodes, comments, episode_likes):
         FROM joined_episodes
     """)
 
-    joined_episodes_df.show(50)
+    # joined_episodes_df.show(50)
     save_to_parquet(joined_episodes_df, "episodes")
 
 
