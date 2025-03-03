@@ -1,6 +1,6 @@
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import (
-    col, lit, explode, concat_ws, split, 
+    col, lit, when, explode, concat_ws, split, 
     to_date, from_utc_timestamp, input_file_name
 )
 from datetime import datetime
@@ -8,6 +8,8 @@ from datetime import datetime
 NOW = datetime.now()
 PLATFORM = "kakao"
 BUCKET_RAW = "s3a://wt-grepp-lake/raw/{platform}/{target}/{target_date}"
+
+SHOW = True
 
 
 def get_comments(spark, date):
@@ -66,16 +68,16 @@ def get_titles(spark, date):
     return df.select(explode(col("data")).alias("data")) \
         .select(
             explode(col("data.cardGroups")).alias("cardGroups"), 
-            col("data.title").alias("release_day")
-        ).select(explode(col("cardGroups.cards")).alias("cards"), col("release_day")) \
-        .select(col("cards.content").alias("content"), col("release_day")) \
+            col("data.title").alias("weekday_str")
+        ).select(explode(col("cardGroups.cards")).alias("cards"), col("weekday_str")) \
+        .select(col("cards.content").alias("content"), col("weekday_str")) \
         .select(
             lit(PLATFORM).alias("platform"),
             col("content.id").alias("id"), 
             col("content.title").alias("title"), 
             concat_ws(" / ", col("content.authors.name")).alias("author"),
             col("content.featuredCharacterImageA").alias("image_url"), 
-            col("release_day"),
+            col("weekday_str"),
             lit(False).alias("is_completed"),
             explode("content.seoKeywords").alias("genre_name")
         )
@@ -83,8 +85,8 @@ def get_titles(spark, date):
 
 def save_to_parquet(df, target):
     date_str = NOW.strftime("year=%Y/month=%m/day=%d")
-    path = f"s3a://wt-grepp-lake/processed/{target}/{date_str}/{PLATFORM}/{target}"
-    df.write.format("parquet").mode("overwrite").save(path)
+    path = f"s3a://wt-grepp-lake/processed/{target}/{date_str}"
+    df.write.partitionBy("platform").format("parquet").mode("append").save(path)
     print(f"Data successfully saved to {path}")
 
 
@@ -94,7 +96,24 @@ def backup_to_parquet(df, target):
     print(f"Data successfully backup to {path}")
 
 
-def join_titles(spark, titles, title_info):
+def convert_weekday(df):
+    return df.withColumn("release_day", 
+                         when(col("weekday_str") == "월", 0)
+                         .when(col("weekday_str") == "화", 1)
+                         .when(col("weekday_str") == "수", 2)
+                         .when(col("weekday_str") == "목", 3)
+                         .when(col("weekday_str") == "금", 4)
+                         .when(col("weekday_str") == "토", 5)
+                         .when(col("weekday_str") == "일", 6)
+                         .otherwise(7)) 
+
+
+def convert_timestamp(df):
+    return df.withColumn("timestamp", from_utc_timestamp(col("start_date"), "UTC")) \
+             .withColumn("updated_date", to_date(col("timestamp")))
+
+
+def convert_titles(spark, titles, title_info):
     titles.createOrReplaceTempView("titles_table")
     title_info.createOrReplaceTempView("title_info_table")
 
@@ -113,16 +132,20 @@ def join_titles(spark, titles, title_info):
         FROM joined_titles
     """)
     joined_genres_df = spark.sql("""
-        SELECT platform, id AS title_id, genre_name FROM joined_titles
+        SELECT DISTINCT 
+            platform, id AS title_id, SUBSTRING(genre_name, 2)  
+        FROM joined_titles
     """)
 
-    # joined_titles_df.show(50)
-    # joined_genres_df.show(50)
+    if SHOW:
+        joined_titles_df.show(50)
+        joined_genres_df.show(50)
+
     save_to_parquet(joined_titles_df, "titles")
     save_to_parquet(joined_genres_df, "genres")
 
 
-def join_episodes(spark, episodes, episode_likes, comments):
+def convert_episodes(spark, episodes, episode_likes, comments):
     episodes.createOrReplaceTempView("episodes_table")
     episode_likes.createOrReplaceTempView("episode_likes_table")
     comments.createOrReplaceTempView("comments_table")
@@ -147,36 +170,43 @@ def join_episodes(spark, episodes, episode_likes, comments):
         FROM joined_episodes
     """)
 
-    # joined_episodes_df.show(50)
+    if SHOW:
+        joined_episodes_df.show(50)
+
     save_to_parquet(joined_episodes_df, "episodes")
 
 
-def run():
-    spark = SparkSession.builder \
-        .appName("S3 {PLATFORM} Data Processing") \
+def create_spark_session():
+    return SparkSession.builder \
+        .appName("S3 Data Reader") \
         .config("spark.hadoop.fs.s3a.endpoint", "s3.amazonaws.com") \
         .config("spark.hadoop.fs.s3a.aws.credentials.provider", "org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider") \
         .config("spark.hadoop.fs.s3a.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem") \
         .getOrCreate()
 
+
+def run():
+    spark = create_spark_session()
     date_str = NOW.strftime("%Y/%m/%d")
     
     titles_df = get_titles(spark, date_str)
+    titles_df = convert_weekday(titles_df)
     title_info_df = get_title_info(spark, date_str)
+
     episodes_df = get_episodes(spark, date_str)
-    episodes_df = episodes_df.withColumn("timestamp", from_utc_timestamp(col("start_date"), "UTC")) \
-                             .withColumn("updated_date", to_date(col("timestamp")))
+    episodes_df = convert_timestamp(episodes_df)
     episode_likes_df = get_episode_likes(spark, date_str)
     comments_df = get_comments(spark, date_str)
 
     backup_to_parquet(titles_df, "titles")
     backup_to_parquet(title_info_df, "title_info")
+
     backup_to_parquet(episodes_df, "episodes")
     backup_to_parquet(episode_likes_df, "episode_likes")
     backup_to_parquet(comments_df, "comments")
     
-    join_titles(spark, titles_df, title_info_df)
-    join_episodes(spark, episodes_df, episode_likes_df, comments_df)
+    convert_titles(spark, titles_df, title_info_df)
+    convert_episodes(spark, episodes_df, episode_likes_df, comments_df)
 
 
 run()
