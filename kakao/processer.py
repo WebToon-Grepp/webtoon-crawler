@@ -9,6 +9,7 @@ NOW = datetime.now()
 PLATFORM = "kakao"
 BUCKET_RAW = "s3a://wt-grepp-lake/raw/{platform}/{target}/{target_date}"
 
+BACKUP = False
 SHOW = True
 
 
@@ -198,12 +199,13 @@ def run():
     episode_likes_df = get_episode_likes(spark, date_str)
     comments_df = get_comments(spark, date_str)
 
-    backup_to_parquet(titles_df, "titles")
-    backup_to_parquet(title_info_df, "title_info")
+    if BACKUP:
+        backup_to_parquet(titles_df, "titles")
+        backup_to_parquet(title_info_df, "title_info")
 
-    backup_to_parquet(episodes_df, "episodes")
-    backup_to_parquet(episode_likes_df, "episode_likes")
-    backup_to_parquet(comments_df, "comments")
+        backup_to_parquet(episodes_df, "episodes")
+        backup_to_parquet(episode_likes_df, "episode_likes")
+        backup_to_parquet(comments_df, "comments")
     
     convert_titles(spark, titles_df, title_info_df)
     convert_episodes(spark, episodes_df, episode_likes_df, comments_df)
