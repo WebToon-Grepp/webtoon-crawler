@@ -6,15 +6,17 @@ from pyspark.sql.functions import (
 from datetime import datetime
 
 NOW = datetime.now()
+
+BUCKET = "wt-grepp-lake"
 PLATFORM = "kakao"
-BUCKET_RAW = "s3a://wt-grepp-lake/raw/{platform}/{target}/{target_date}"
+RAW = "s3a://{bucket}/raw/{platform}/{target}/{target_date}"
 
 BACKUP = False
-SHOW = True
+SHOW = False
 
 
 def get_comments(spark, date):
-    url = BUCKET_RAW.format(platform=PLATFORM, target="comments", target_date=date)
+    url = RAW.format(bucket=BUCKET, platform=PLATFORM, target="comments", target_date=date)
     df = spark.read.json(f"{url}/*/*.json", multiLine=True)
     df = df.withColumn("filename", input_file_name()) \
            .withColumn("title_id", split(col("filename"), "/").getItem(9)) \
@@ -28,7 +30,7 @@ def get_comments(spark, date):
 
 
 def get_episode_likes(spark, date):
-    url = BUCKET_RAW.format(platform=PLATFORM, target="episode_likes", target_date=date)
+    url = RAW.format(bucket=BUCKET, platform=PLATFORM, target="episode_likes", target_date=date)
     df = spark.read.json(f"{url}/*/*.json", multiLine=True)
     df = df.withColumn("filename", input_file_name())
     return df.select(
@@ -40,7 +42,7 @@ def get_episode_likes(spark, date):
 
 
 def get_episodes(spark, date):
-    url = BUCKET_RAW.format(platform=PLATFORM, target="episodes", target_date=date)
+    url = RAW.format(bucket=BUCKET, platform=PLATFORM, target="episodes", target_date=date)
     df = spark.read.json(f"{url}/*/*.json", multiLine=True)
     return df.select(explode(col("data.episodes")).alias("episodes")) \
         .select(
@@ -54,7 +56,7 @@ def get_episodes(spark, date):
 
 
 def get_title_info(spark, date):
-    url = BUCKET_RAW.format(platform=PLATFORM, target="title_info", target_date=date)
+    url = RAW.format(bucket=BUCKET, platform=PLATFORM, target="title_info", target_date=date)
     df = spark.read.json(f"{url}/*.json", multiLine=True)
     return df.select(
             lit(PLATFORM).alias("platform"),
@@ -64,7 +66,7 @@ def get_title_info(spark, date):
 
 
 def get_titles(spark, date):
-    url = BUCKET_RAW.format(platform=PLATFORM, target="titles", target_date=date)
+    url = RAW.format(bucket=BUCKET, platform=PLATFORM, target="titles", target_date=date)
     df = spark.read.json(f"{url}/*.json", multiLine=True)
     return df.select(explode(col("data")).alias("data")) \
         .select(
@@ -202,7 +204,7 @@ def run():
     if BACKUP:
         backup_to_parquet(titles_df, "titles")
         backup_to_parquet(title_info_df, "title_info")
-
+    
         backup_to_parquet(episodes_df, "episodes")
         backup_to_parquet(episode_likes_df, "episode_likes")
         backup_to_parquet(comments_df, "comments")
