@@ -287,12 +287,13 @@ def fetch_episode_likes(title_id, episode_id=None):
                 response.raise_for_status()
                 data = response.json()
 
+                file_path = f'{output_dir}{episode_id}.json'
+
                 if not data['contents'][0]['reactions'] and not data['contents'][0]['reactionMap']:
                     print(f"{title_id}의 에피소드 {episode_id - 1}까지의 likes 데이터를 {file_path}에 저장했습니다.")
                     print(f"{title_id}의 에피소드 {episode_id}에 좋아요 데이터가 더이상 없습니다. 종료합니다.")
                     break
 
-                file_path = f'{output_dir}{episode_id}.json'
                 with open(file_path, 'w', encoding='utf-8') as f:
                     json.dump(data, f, ensure_ascii=False, indent=4)
 
@@ -348,14 +349,24 @@ def fetch_titles_daily(dayInt):
         return None
 
 def fetch_all_data():
+    '''
     clear_output_folder()
 
     titles = fetch_titles()
     finished_titles = fetch_finished_titles()
     
     final_titles = titles + finished_titles
+    '''
+    finished_titles = fetch_finished_titles()
+    '''
+    length = len(finished_titles)
+    print(length)
 
-    for title in final_titles:
+    index = finished_titles.index(347685)
+    print(index)
+    '''
+
+    for title in finished_titles[1175:]:
         fetch_title_info(title)
         fetch_episode_list(title)
         fetch_episode_info(title)
