@@ -8,12 +8,13 @@ BUCKET = "wt-grepp-lake"
 def generate_path(target, date=False, platform=None):
     base_path = f"s3a://{BUCKET}/processed/{target}"
 
+    if platform:
+        date_str = NOW.strftime("year=%Y/month=%m/day=%d")
+        return f"{base_path}/{date_str}/platform={platform}"
+
     if date:
         date_str = NOW.strftime("year=%Y/month=%m/day=%d")
-        base_path = f"{base_path}/{date_str}"
-
-    if platform:
-        base_path = f"{base_path}/{date_str}/platform={platform}"
+        return f"{base_path}/{date_str}"
     
     return base_path
 
@@ -49,11 +50,11 @@ def run():
     spark = create_spark_session()
     for target in ["titles", "genres", "episodes"]:
         # 전체 보기
-        reader(spark, target)
+        # reader(spark, target)
 
         # 특정 날짜보기
         # reader(spark, target, date=True)
 
         # 특정 날짜/플랫폼별 보기
-        #reader(spark, target, date=True, platform=True) 
+        reader(spark, target, date=True, platform=True) 
 run()
