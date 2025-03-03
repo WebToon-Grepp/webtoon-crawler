@@ -1,6 +1,8 @@
 from pyspark.sql import SparkSession
-from pyspark.sql.types import StructType, StructField, StringType, LongType
-from pyspark.sql.functions import explode, col, lit, concat_ws, to_date, from_utc_timestamp
+from pyspark.sql.functions import (
+    col, lit, explode, concat_ws, split, 
+    to_date, from_utc_timestamp, input_file_name
+)
 from datetime import datetime
 
 NOW = datetime.now()
@@ -8,13 +10,16 @@ PLATFORM = "kakao"
 BUCKET_RAW = "s3a://wt-grepp-lake/raw/{platform}/{target}/{target_date}"
 
 
-def get_comments(spark, title_id, episode_id, date):
+def get_comments(spark, date):
     url = BUCKET_RAW.format(platform=PLATFORM, target="comments", target_date=date)
-    df = spark.read.json(f"{url}/{title_id}/{episode_id}.json", multiLine=True)
+    df = spark.read.json(f"{url}/*/*.json", multiLine=True)
+    df = df.withColumn("filename", input_file_name()) \
+           .withColumn("title_id", split(col("filename"), "/").getItem(9)) \
+           .withColumn("episode_id", split(col("filename"), "/").getItem(10))
     return df.select(
             lit(PLATFORM).alias("platform"),
-            lit(title_id).alias("title_id"),
-            lit(episode_id).alias("id"),
+            col("title_id"),
+            split(col("episode_id"), "\.").getItem(0).alias("id"),
             col("meta.pagination.totalCount").alias("comments")
         )
 
@@ -22,8 +27,10 @@ def get_comments(spark, title_id, episode_id, date):
 def get_episode_likes(spark, date):
     url = BUCKET_RAW.format(platform=PLATFORM, target="episode_likes", target_date=date)
     df = spark.read.json(f"{url}/*/*.json", multiLine=True)
+    df = df.withColumn("filename", input_file_name())
     return df.select(
             lit(PLATFORM).alias("platform"),
+            split(col("filename"), "/").getItem(9).alias("title_id"),
             col("data.episodeId").alias("id"),
             col("data.likeCount").alias("likes")
         )
@@ -95,7 +102,7 @@ def join_titles(spark, titles, title_info):
         CREATE OR REPLACE TEMP VIEW joined_titles AS
         SELECT t.*, ti.views
         FROM titles_table t
-        JOIN title_info_table ti
+        LEFT JOIN title_info_table ti
             ON t.platform = ti.platform
             AND t.id = ti.id
     """)
@@ -115,7 +122,7 @@ def join_titles(spark, titles, title_info):
     save_to_parquet(joined_genres_df, "genres")
 
 
-def join_episodes(spark, episodes, comments, episode_likes):
+def join_episodes(spark, episodes, episode_likes, comments):
     episodes.createOrReplaceTempView("episodes_table")
     episode_likes.createOrReplaceTempView("episode_likes_table")
     comments.createOrReplaceTempView("comments_table")
@@ -124,13 +131,14 @@ def join_episodes(spark, episodes, comments, episode_likes):
         CREATE OR REPLACE TEMP VIEW joined_episodes AS
         SELECT e.*, c.comments, el.likes
         FROM episodes_table e
-        JOIN comments_table c
-            ON e.platform = c.platform
-            AND e.title_id = c.title_id
-            AND e.id = c.id
-        JOIN episode_likes_table el
-            ON c.platform = el.platform
-            AND c.id = el.id
+        LEFT JOIN episode_likes_table el
+            ON e.platform = el.platform
+            AND e.title_id = el.title_id
+            AND e.id = el.id
+        LEFT JOIN comments_table c
+            ON el.platform = c.platform
+            AND el.title_id = c.title_id
+            AND el.id = c.id
     """)
 
     joined_episodes_df = spark.sql("""
@@ -159,23 +167,7 @@ def run():
     episodes_df = episodes_df.withColumn("timestamp", from_utc_timestamp(col("start_date"), "UTC")) \
                              .withColumn("updated_date", to_date(col("timestamp")))
     episode_likes_df = get_episode_likes(spark, date_str)
-    
-    comments_schema = StructType([
-        StructField("platform", StringType(), True),
-        StructField("title_id", StringType(), True),
-        StructField("id", LongType(), True),
-        StructField("comments", LongType(), True)
-    ])
-    comments_df = spark.createDataFrame([], comments_schema)
-    episode_group = episodes_df.select("platform", "title_id", "id") \
-        .groupBy("platform", "title_id", "id").count()
-
-    for row in episode_group.toLocalIterator():
-        title_id = row["title_id"]
-        episode_id = row["id"]
-
-        cdf = get_comments(spark, title_id, episode_id, date_str)
-        comments_df = comments_df.union(cdf)
+    comments_df = get_comments(spark, date_str)
 
     backup_to_parquet(titles_df, "titles")
     backup_to_parquet(title_info_df, "title_info")
@@ -184,7 +176,7 @@ def run():
     backup_to_parquet(comments_df, "comments")
     
     join_titles(spark, titles_df, title_info_df)
-    join_episodes(spark, episodes_df, comments_df, episode_likes_df)
+    join_episodes(spark, episodes_df, episode_likes_df, comments_df)
 
 
 run()
