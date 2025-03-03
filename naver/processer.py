@@ -1,5 +1,8 @@
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import split, explode, col, lit, from_unixtime, col, to_date
+from pyspark.sql.functions import (
+    col, lit, explode, split, 
+    to_date, from_unixtime
+)
 from datetime import datetime
 
 NOW = datetime.now()
@@ -97,23 +100,23 @@ def backup_to_parquet(df, target):
     print(f"Data successfully backup to {path}")
 
 
-def join_episodes(spark, episodes, comments, episode_likes):
+def join_episodes(spark, episodes, episode_likes, comments):
     episodes.createOrReplaceTempView("episodes_table")
     episode_likes.createOrReplaceTempView("episode_likes_table")
     comments.createOrReplaceTempView("comments_table")
 
     spark.sql("""
         CREATE OR REPLACE TEMP VIEW joined_episodes AS
-        SELECT e.*, c.comments, el.likes, el.updated_date
+        SELECT e.*, el.likes, el.updated_date, c.comments
         FROM episodes_table e
-        JOIN comments_table c
-            ON e.platform = c.platform
-            AND e.title_id = c.title_id
-            AND e.id = c.id
-        JOIN episode_likes_table el
-            ON c.platform = el.platform
-            AND c.title_id = el.title_id
-            AND c.id = el.id
+        LEFT JOIN episode_likes_table el
+            ON e.platform = el.platform
+            AND e.title_id = el.title_id
+            AND e.id = el.id
+        LEFT JOIN comments_table c
+            ON el.platform = c.platform
+            AND el.title_id = c.title_id
+            AND el.id = c.id
     """)
 
     joined_episodes_df = spark.sql("""
@@ -156,6 +159,6 @@ def run():
     save_to_parquet(titles_df, "titles")
     save_to_parquet(title_info_df, "genres")
 
-    join_episodes(spark, episodes_df, comments_df, episode_likes_df)
+    join_episodes(spark, episodes_df, episode_likes_df, comments_df)
 
 run()
