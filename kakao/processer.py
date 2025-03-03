@@ -136,7 +136,7 @@ def convert_titles(spark, titles, title_info):
     """)
     joined_genres_df = spark.sql("""
         SELECT DISTINCT 
-            platform, id AS title_id, SUBSTRING(genre_name, 2)  
+            platform, id AS title_id, SUBSTRING(genre_name, 2) AS genre_name
         FROM joined_titles
     """)
 
