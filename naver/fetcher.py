@@ -390,3 +390,4 @@ def fetch_daily_data(dayInt):
         fetch_comments(title, latest_episode_id)
         fetch_episode_likes(title, latest_episode_id)
         print()
+        
