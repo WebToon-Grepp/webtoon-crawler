@@ -69,8 +69,7 @@ def get_title_info(spark, date):
     return df.select(
             lit(PLATFORM).alias("platform"),
             col("gfpAdCustomParam.titleId").alias("title_id"),
-            explode("gfpAdCustomParam.tags").alias("genre_name"),
-            explode("gfpAdCustomParam.weekdays").alias("weekday")
+            explode("gfpAdCustomParam.tags").alias("genre_name")
         )
 
 
@@ -89,20 +88,6 @@ def get_titles(spark, date, dayInt):
             col("title.thumbnailUrl").alias("image_url"), 
             lit(days[dayInt]).alias("weekday_str"),
             lit(False).alias("is_completed")
-        )
-
-
-def get_finished_titles(spark, date):
-    url = RAW.format(bucket=BUCKET, platform=PLATFORM, target="finished_titles", target_date=date)
-    df = spark.read.json(f"{url}/*/*.json", multiLine=True)
-    return df.select(
-            lit(PLATFORM).alias("platform"),
-            col("titleList.titleId").alias("id"),
-            col("titleList.titleName").alias("title"),
-            col("titleList.author").alias("author"),
-            col("titleList.viewCount").alias("views"),
-            col("titleList.thumbnailUrl").alias("image_url"),
-            lit(True).alias("is_completed")
         )
 
 
@@ -128,18 +113,6 @@ def convert_weekday(df):
                          .when(col("weekday_str") == "FRIDAY", 4)
                          .when(col("weekday_str") == "SATURDAY", 5)
                          .when(col("weekday_str") == "SUNDAY", 6)
-                         .otherwise(7))
-
-
-def convert_weekday_v2(df):
-    return df.withColumn("release_day", 
-                         when(col("weekday") == "월", 0)
-                         .when(col("weekday") == "화", 1)
-                         .when(col("weekday") == "수", 2)
-                         .when(col("weekday") == "목", 3)
-                         .when(col("weekday") == "금", 4)
-                         .when(col("weekday") == "토", 5)
-                         .when(col("weekday") == "일", 6)
                          .otherwise(7)) 
 
 
@@ -167,36 +140,6 @@ def convert_titles(spark, titles, title_info):
 
     save_to_parquet(titles_df, "titles")
     save_to_parquet(genres_df, "genres")
-
-
-def convert_titles_v2(spark, finished_titles, finished_title_info):
-    finished_titles.createOrReplaceTempView("titles_table")
-    finished_title_info.createOrReplaceTempView("title_info_table")
-
-    title_info_distinct_df = spark.sql("""
-        SELECT DISTINCT
-            title_id, release_day
-        FROM title_info_table
-    """)
-    title_info_distinct_df.createOrReplaceTempView("title_info_distinct_table")
-
-    titles_df = spark.sql("""
-        SELECT DISTINCT 
-            t.platform, t.id, t.title, t.author, t.views, t.image_url, ti.release_day, t.is_completed
-        FROM titles_table t
-        LEFT JOIN title_info_distinct_table ti
-        ON t.id = ti.title_id
-    """)
-    genres_df = spark.sql("""
-        SELECT DISTINCT platform, title_id, genre_name FROM title_info_table
-    """)
-
-    if SHOW:
-        titles_df.show(50)
-        genres_df.show(50)
-
-    save_to_parquet(titles_df, "finished_titles")
-    save_to_parquet(genres_df, "finished_genres")
 
 
 def convert_episodes(spark, episodes, episode_likes, comments):
@@ -253,15 +196,6 @@ def run():
     episode_likes_df = convert_timestamp(episode_likes_df)
     comments_df = get_comments(spark, date_str)
 
-    finished_titles_df = get_finished_titles(spark, "2025/02/27")
-    finished_title_info_df = get_title_info(spark, "2025/02/27")
-    finished_title_info_df = convert_weekday_v2(finished_title_info_df)
-
-    finished_episodes_df = get_episodes(spark, "2025/02/27")
-    finished_episode_likes_df = get_episode_likes(spark, "2025/02/27")
-    finished_episode_likes_df = convert_timestamp(finished_episode_likes_df)
-    finished_comments_df = get_comments(spark, "2025/02/27")
-
     if BACKUP:
         backup_to_parquet(titles_df, "titles")
         backup_to_parquet(title_info_df, "title_info")
@@ -270,18 +204,8 @@ def run():
         backup_to_parquet(episode_likes_df, "episode_likes")
         backup_to_parquet(comments_df, "comments")
 
-        backup_to_parquet(finished_titles_df, "finished_titles")
-        backup_to_parquet(finished_title_info_df, "finished_title_info")
-
-        backup_to_parquet(finished_episodes_df, "finished_episodes")
-        backup_to_parquet(finished_episode_likes_df, "finished_episode_likes")
-        backup_to_parquet(finished_comments_df, "finished_comments")
-
     convert_titles(spark, titles_df, title_info_df)
     convert_episodes(spark, episodes_df, episode_likes_df, comments_df)
-    
-    convert_titles_v2(spark, finished_titles_df, finished_title_info_df)
-    convert_episodes(spark, finished_episodes_df, finished_episode_likes_df, finished_comments_df)
 
 
 run()
