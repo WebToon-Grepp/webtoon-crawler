@@ -35,8 +35,28 @@ from platform.fetcher import fetch_all_historical_data
 fetch_all_historical_data()
 ```
 
+### 데이터 전처리 (optimizer)
+크롤링한 데이터를 하나로 합치는 전처리하는 작업입니다. `spark-submit`을 사용해 전처리 작업을 Spark에서 실행하며, AWS S3에 접근할 수 있는 키 정보가 필요합니다.
+
+```bash
+# 네이버 웹툰 데이터 전처리
+spark-submit --master local --packages org.apache.hadoop:hadoop-aws:3.2.2 \
+--conf spark.hadoop.fs.s3a.access.key=<access_key> \
+--conf spark.hadoop.fs.s3a.secret.key=<secret_key> \
+naver/optimizer.py
+
+# 카카오 웹툰 데이터 전처리
+spark-submit --master local --packages org.apache.hadoop:hadoop-aws:3.2.2 \
+--conf spark.hadoop.fs.s3a.access.key=<access_key> \
+--conf spark.hadoop.fs.s3a.secret.key=<secret_key> \
+kakao/optimizer.py
+```
+#### 상수 값 설정
+- **BUCKET**: S3 버킷 이름을 설정하는 상수입니다. 본인의 버킷 이름에 맞게 수정해야 합니다.
+- **SHOW**: 데이터를 50개씩 보여줄지 설정하는 상수입니다. SHOW = True로 설정하면 50개씩 출력됩니다.
+
 ### 데이터 후처리 (processer)
-크롤링한 데이터를 후처리하는 작업입니다. `spark-submit`을 사용해 후처리 작업을 Spark에서 실행하며, AWS S3에 접근할 수 있는 키 정보가 필요합니다.
+크롤링한 데이터를 실사용 전에 후처리하는 작업입니다. `spark-submit`을 사용해 후처리 작업을 Spark에서 실행하며, AWS S3에 접근할 수 있는 키 정보가 필요합니다.
 
 ```bash
 # 네이버 웹툰 데이터 후처리
@@ -53,8 +73,6 @@ kakao/processer.py
 ```
 #### 상수 값 설정
 - **BUCKET**: S3 버킷 이름을 설정하는 상수입니다. 본인의 버킷 이름에 맞게 수정해야 합니다.
-- **SHOW**: 데이터를 50개씩 보여줄지 설정하는 상수입니다. SHOW = True로 설정하면 50개씩 출력됩니다.
-- **BACKUP**: 데이터가 후처리된 후, 백업을 temp 경로에 저장할지 여부를 설정하는 상수입니다. BACKUP = True로 설정하면 temp 경로에 백업이 됩니다.
 
 ### 데이터 읽기 (reader)
 후처리된 데이터를 읽어 출력하는 작업입니다. spark-submit을 사용하여 실행하며, AWS S3에 접근할 수 있는 키 정보가 필요합니다.
