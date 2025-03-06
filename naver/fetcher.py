@@ -146,7 +146,15 @@ def fetch_episode_list(title_id, page_no=None):
             print(f"{title_id}의 {page_no}까지의 회차 목록을 {output_dir}에 저장했습니다.")
 
         except requests.RequestException as e:
-            print(e)
+            if e.response and e.response.status_code == 401:
+                naver_cookie = os.getenv('NAVER_COOKIE', None)
+                if naver_cookie:
+                    headers["Cookie"] = naver_cookie
+                    return fetch_episode_list(title_id)
+                else:
+                    print("NAVER_COOKIE가 존재하지 않습니다.")
+            else:
+                print(e)
     
     else:
         url = NaverWebtoonEndpoint.EPISODE_LIST.value.format(title_id=title_id, page_no=page_no)
@@ -173,7 +181,15 @@ def fetch_episode_list(title_id, page_no=None):
                 return None
 
         except requests.RequestException as e:
-            print(e)
+            if e.response and e.response.status_code == 401:
+                naver_cookie = os.getenv('NAVER_COOKIE', None)
+                if naver_cookie:
+                    headers["Cookie"] = naver_cookie
+                    return fetch_episode_list(title_id, 1)
+                else:
+                    print("NAVER_COOKIE가 존재하지 않습니다.")
+            else:
+                print(e)
 
 def fetch_episode_info(title_id, episode_id = 1):
     current_date = datetime.now().strftime('%Y/%m/%d')
@@ -316,20 +332,13 @@ def fetch_titles_daily(dayInt):
         response.raise_for_status()
         data = response.json()
 
-        titleListMap = {
-            "titleListMap": {
-                day_name: data.get("titleListMap", {}).get(day_name, [])
-            },
-            "dayOfWeek": day_name
-        }
-
         current_date = datetime.now().strftime('%Y/%m/%d')
         file_path = f'output/raw/naver/titles/{current_date}/titles.json'
 
         os.makedirs(os.path.dirname(file_path), exist_ok=True)
 
         with open(file_path, 'w', encoding='utf-8') as f:
-            json.dump(titleListMap, f, ensure_ascii=False, indent=4)
+            json.dump(data, f, ensure_ascii=False, indent=4)
 
         title_list = data.get("titleListMap", {}).get(day_name, [])
 
