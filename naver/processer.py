@@ -71,7 +71,7 @@ def convert_episodes(spark, episodes, episode_likes, comments):
 
 def create_spark_session():
     return SparkSession.builder \
-        .appName("S3 Data Reader") \
+        .appName("S3 Data Processer") \
         .config("spark.hadoop.fs.s3a.endpoint", "s3.amazonaws.com") \
         .config("spark.hadoop.fs.s3a.aws.credentials.provider", "org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider") \
         .config("spark.hadoop.fs.s3a.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem") \

@@ -109,7 +109,7 @@ def convert_timestamp(df):
 
 def create_spark_session():
     return SparkSession.builder \
-        .appName("S3 Data Reader") \
+        .appName("S3 Data Optimizer") \
         .config("spark.hadoop.fs.s3a.endpoint", "s3.amazonaws.com") \
         .config("spark.hadoop.fs.s3a.aws.credentials.provider", "org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider") \
         .config("spark.hadoop.fs.s3a.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem") \
