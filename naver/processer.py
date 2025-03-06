@@ -15,7 +15,7 @@ def read_to_parquet(spark, target, date):
 
 def save_to_parquet(df, target):
     date_str = NOW.strftime("year=%Y/month=%m/day=%d")
-    path = f"s3a://wt-grepp-lake/processed_temp/{target}/{date_str}"
+    path = f"s3a://wt-grepp-lake/processed/{target}/{date_str}"
     df.write.partitionBy("platform").format("parquet").mode("append").save(path)
     print(f"Data successfully saved to {path}")
 
