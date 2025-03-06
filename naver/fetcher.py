@@ -332,20 +332,13 @@ def fetch_titles_daily(dayInt):
         response.raise_for_status()
         data = response.json()
 
-        titleListMap = {
-            "titleListMap": {
-                day_name: data.get("titleListMap", {}).get(day_name, [])
-            },
-            "dayOfWeek": day_name
-        }
-
         current_date = datetime.now().strftime('%Y/%m/%d')
         file_path = f'output/raw/naver/titles/{current_date}/titles.json'
 
         os.makedirs(os.path.dirname(file_path), exist_ok=True)
 
         with open(file_path, 'w', encoding='utf-8') as f:
-            json.dump(titleListMap, f, ensure_ascii=False, indent=4)
+            json.dump(data, f, ensure_ascii=False, indent=4)
 
         title_list = data.get("titleListMap", {}).get(day_name, [])
 
