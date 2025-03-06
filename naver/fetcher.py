@@ -111,7 +111,7 @@ def fetch_title_info(title_id):
     except requests.RequestException as e:
         print(e)
 
-def fetch_episode_list(title_id, page_no=None):
+def fetch_episode_list(title_id, page_no=None, retry_count=1):
     if page_no is None:
         url = NaverWebtoonEndpoint.EPISODE_LIST.value.format(title_id=title_id, page_no=1)
 
@@ -146,11 +146,11 @@ def fetch_episode_list(title_id, page_no=None):
             print(f"{title_id}의 {page_no}까지의 회차 목록을 {output_dir}에 저장했습니다.")
 
         except requests.RequestException as e:
-            if e.response and e.response.status_code == 401:
+            if e.response is not None and e.response.status_code == 401 and retry_count == 1:
                 naver_cookie = os.getenv('NAVER_COOKIE', None)
                 if naver_cookie:
                     headers["Cookie"] = naver_cookie
-                    return fetch_episode_list(title_id)
+                    return fetch_episode_list(title_id, None, retry_count - 1)
                 else:
                     print("NAVER_COOKIE가 존재하지 않습니다.")
             else:
@@ -181,11 +181,11 @@ def fetch_episode_list(title_id, page_no=None):
                 return None
 
         except requests.RequestException as e:
-            if e.response and e.response.status_code == 401:
+            if e.response is not None and e.response.status_code == 401 and retry_count == 1:
                 naver_cookie = os.getenv('NAVER_COOKIE', None)
                 if naver_cookie:
                     headers["Cookie"] = naver_cookie
-                    return fetch_episode_list(title_id, 1)
+                    return fetch_episode_list(title_id, 1, retry_count - 1)
                 else:
                     print("NAVER_COOKIE가 존재하지 않습니다.")
             else:
