@@ -1,7 +1,7 @@
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import (
     col, lit, when, explode, split, 
-    to_date, from_unixtime, array
+    to_date, from_unixtime, array, size
 )
 from datetime import datetime
 
