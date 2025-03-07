@@ -76,7 +76,10 @@ def get_title_info(spark, date):
             col("gfpAdCustomParam.titleId").alias("title_id"),
             explode("gfpAdCustomParam.tags").alias("genre_name"),
             explode(
-                when(col("gfpAdCustomParam.weekdays").isNull(), array(lit("day")))
+                when(
+                    col("gfpAdCustomParam.weekdays").isNull() | (size(col("gfpAdCustomParam.weekdays")) == 0), 
+                    array(lit("day"))
+                )
                 .otherwise(col("gfpAdCustomParam.weekdays"))
             ).alias("weekday")
         )

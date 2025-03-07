@@ -251,19 +251,35 @@ def fetch_comments(title_id, episode_id=None):
                 response = requests.get(url, headers=headers)
                 response.raise_for_status()
                 data = response.text
-                json_data = json.loads(data[data.index('(')+1:-2])  # JavaScript 데이터 처리
+                json_data = json.loads(data[data.index('(') + 1:-2])  # JavaScript 데이터 처리
 
                 if json_data.get("result", {}).get("count", {}).get("total") == 0:
-                    print(f"{title_id}의 에피소드 {episode_id - 1}까지의 comment 데이터를 {file_path}에 저장했습니다.")
-                    print(f"{title_id}의 에피소드 {episode_id}에 댓글이 없습니다. 종료합니다.")
-                    break
+                    next_episode_id = episode_id + 1
+                    next_url = NaverWebtoonEndpoint.COMMENTS.value.format(title_id=title_id, episode_id=next_episode_id)
+                    next_response = requests.get(next_url, headers=headers)
+                    next_response.raise_for_status()
+                    next_data = next_response.text
+                    next_json_data = json.loads(next_data[next_data.index('(') + 1:-2])
 
-                file_path = f'{output_dir}{episode_id}.json'
-                
-                with open(file_path, 'w', encoding='utf-8') as f:
-                    json.dump(json_data, f, ensure_ascii=False, indent=4)
+                    if next_json_data.get("result", {}).get("count", {}).get("total") == 0:
+                        print(f"{title_id}의 에피소드 {episode_id - 1}까지의 comment 데이터를 {file_path}에 저장했습니다.")
+                        print(f"{title_id}의 에피소드 {episode_id}와 {next_episode_id}에 댓글이 없습니다. 종료합니다.")
+                        break
 
-                episode_id += 1
+                    file_path = f'{output_dir}{next_episode_id}.json'
+                    with open(file_path, 'w', encoding='utf-8') as f:
+                        json.dump(json_data, f, ensure_ascii=False, indent=4)
+
+                    episode_id += 2
+                    time.sleep(0.1)
+
+                else:
+                    file_path = f'{output_dir}{episode_id}.json'
+                    with open(file_path, 'w', encoding='utf-8') as f:
+                        json.dump(json_data, f, ensure_ascii=False, indent=4)
+
+                    episode_id += 1
+                    time.sleep(0.1)
 
             except requests.RequestException as e:
                 print(e)
@@ -304,17 +320,30 @@ def fetch_episode_likes(title_id, episode_id=None):
                 data = response.json()
 
                 if not data['contents'][0]['reactions'] and not data['contents'][0]['reactionMap']:
-                    print(f"{title_id}의 에피소드 {episode_id - 1}까지의 likes 데이터를 {file_path}에 저장했습니다.")
-                    print(f"{title_id}의 에피소드 {episode_id}에 좋아요 데이터가 더이상 없습니다. 종료합니다.")
-                    break
+                    next_episode_id = episode_id + 1
+                    next_url = NaverWebtoonEndpoint.EPISODE_LIKES.value.format(title_id=title_id, episode_id=next_episode_id)
+                    next_response = requests.get(next_url)
+                    next_response.raise_for_status()
+                    next_data = next_response.json()
 
-                file_path = f'{output_dir}{episode_id}.json'
-                with open(file_path, 'w', encoding='utf-8') as f:
-                    json.dump(data, f, ensure_ascii=False, indent=4)
+                    if not next_data['contents'][0]['reactions'] and not next_data['contents'][0]['reactionMap']:
+                        print(f"{title_id}의 에피소드 {episode_id - 1}까지의 likes 데이터를 {file_path}에 저장했습니다.")
+                        print(f"{title_id}의 에피소드 {episode_id}와 {next_episode_id}에 좋아요 데이터가 더이상 없습니다. 종료합니다.")
+                        break
 
-                episode_id += 1
+                    file_path = f'{output_dir}{next_episode_id}.json'
+                    with open(file_path, 'w', encoding='utf-8') as f:
+                        json.dump(data, f, ensure_ascii=False, indent=4)
 
-                time.sleep(0.1)
+                    episode_id += 2
+                    time.sleep(0.1)
+                else:
+                    file_path = f'{output_dir}{episode_id}.json'
+                    with open(file_path, 'w', encoding='utf-8') as f:
+                        json.dump(data, f, ensure_ascii=False, indent=4)
+
+                    episode_id += 1
+                    time.sleep(0.1)
 
             except requests.RequestException as e:
                 print(e)
