@@ -75,6 +75,25 @@ def get_title_info(spark, date):
         )
 
 
+def get_titles(spark, date):
+    url = RAW.format(bucket=BUCKET, platform=PLATFORM, target="titles", target_date=date)
+    df = spark.read.json(f"{url}/*.json", multiLine=True)
+    return df.select(explode(col("data")).alias("data")) \
+        .select(
+            explode(col("data.cardGroups")).alias("cardGroups")
+        ).select(explode(col("cardGroups.cards")).alias("cards")) \
+        .select(col("cards.content").alias("content")) \
+        .select(
+            lit(PLATFORM).alias("platform"),
+            col("content.id").alias("id"), 
+            col("content.title").alias("title"), 
+            concat_ws(" / ", col("content.authors.name")).alias("author"),
+            col("content.featuredCharacterImageA").alias("image_url"),
+            lit(False).alias("is_completed"),
+            explode("content.seoKeywords").alias("genre_name")
+        )
+
+
 def get_finished_titles(spark, date):
     url = RAW.format(bucket=BUCKET, platform=PLATFORM, target="finished_titles", target_date=date)
     df = spark.read.json(f"{url}/*.json", multiLine=True)
@@ -193,15 +212,15 @@ def create_spark_session():
 def run():
     spark = create_spark_session()
 
+    titles_df = get_titles(spark, "2025/02/27")
     finished_titles_df = get_finished_titles(spark, "2025/02/27")
     finished_title_info_df = get_title_info(spark, "2025/02/27")
     finished_title_info_df = convert_weekday(finished_title_info_df)
-
+    
     finished_episodes_df = get_episodes(spark, "2025/02/27")
     finished_episodes_df = convert_timestamp(finished_episodes_df)
     finished_episode_likes_df = get_episode_likes(spark, "2025/02/27")
     finished_comments_df = get_comments(spark, "2025/02/27")
-
 
     if BACKUP:
         backup_to_parquet(finished_titles_df, "finished_titles")
@@ -210,7 +229,8 @@ def run():
         backup_to_parquet(finished_episodes_df, "finished_episodes")
         backup_to_parquet(finished_episode_likes_df, "finished_episode_likes")
         backup_to_parquet(finished_comments_df, "finished_comments")
-
+    
+    convert_titles(spark, titles_df, finished_title_info_df)
     convert_titles(spark, finished_titles_df, finished_title_info_df)
     convert_episodes(spark, finished_episodes_df, finished_episode_likes_df, finished_comments_df)
 
