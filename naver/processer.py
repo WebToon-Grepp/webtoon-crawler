@@ -3,9 +3,7 @@ from pyspark.sql.functions import (
     col, lit, when, explode, split, 
     to_date, from_unixtime
 )
-from datetime import datetime
-
-NOW = datetime.now()
+from datetime import datetime, timedelta
 
 BUCKET = "wt-grepp-lake"
 PLATFORM = "naver"
@@ -71,9 +69,8 @@ def read_to_parquet(spark, target, date):
     return df
 
 
-def save_to_parquet(df, target):
-    date_str = NOW.strftime("year=%Y/month=%m/day=%d")
-    path = f"s3a://wt-grepp-lake/processed/{target}/{date_str}"
+def save_to_parquet(df, date, target):
+    path = f"s3a://{BUCKET}/processed/{target}/{date}"
     df.write.partitionBy("platform").format("parquet").mode("append").save(path)
     print(f"Data successfully saved to {path}")
 
@@ -95,7 +92,7 @@ def convert_timestamp(df):
              .withColumn("updated_date", to_date(col("timestamp")))
 
 
-def convert_titles(spark, titles, title_info):
+def convert_titles(spark, titles, title_info, date):
     titles.createOrReplaceTempView("titles_table")
     title_info.createOrReplaceTempView("title_info_table")
 
@@ -110,11 +107,11 @@ def convert_titles(spark, titles, title_info):
         FROM title_info_table
     """)
 
-    save_to_parquet(titles_df, "titles")
-    save_to_parquet(genres_df, "genres")
+    save_to_parquet(titles_df, "titles", date)
+    save_to_parquet(genres_df, "genres", date)
 
 
-def convert_episodes(spark, episodes, episode_likes, comments):
+def convert_episodes(spark, episodes, episode_likes, comments, date):
     episodes.createOrReplaceTempView("episodes_table")
     episode_likes.createOrReplaceTempView("episode_likes_table")
     comments.createOrReplaceTempView("comments_table")
@@ -140,7 +137,7 @@ def convert_episodes(spark, episodes, episode_likes, comments):
         WHERE updated_date IS NOT NULL
     """)
 
-    save_to_parquet(joined_episodes_df, "episodes")
+    save_to_parquet(joined_episodes_df, "episodes", date)
 
 
 def create_spark_session():
@@ -152,16 +149,16 @@ def create_spark_session():
         .getOrCreate()
 
 
-def run():
+def run_spark(target):
     spark = create_spark_session()
-    date_str = NOW.strftime("year=%Y/month=%m/day=%d")
+    date_str = target.strftime("year=%Y/month=%m/day=%d")
     
     print("Data processing to titles and genres")
     titles_df = read_to_parquet(spark, "titles", date_str)
     titles_df = convert_weekday(titles_df)
 
     title_info_df = read_to_parquet(spark, "title_info", date_str)
-    convert_titles(spark, titles_df, title_info_df)
+    convert_titles(spark, titles_df, title_info_df, date_str)
 
     print("Data processing to episodes")
     episodes_df = read_to_parquet(spark, "episodes", date_str)
@@ -169,7 +166,17 @@ def run():
     episode_likes_df = convert_timestamp(episode_likes_df)
 
     comments_df = read_to_parquet(spark, "comments", date_str)
-    convert_episodes(spark, episodes_df, episode_likes_df, comments_df)
+    convert_episodes(spark, episodes_df, episode_likes_df, comments_df, date_str)
 
 
-run()
+def run_until_today():
+    start_date = datetime(2025, 2, 28) # 프로젝트 시작 날짜
+    end_date = datetime.today() 
+
+    current_date = start_date
+    while current_date < end_date:
+        run_spark(current_date)
+        current_date += timedelta(days=1) 
+
+
+run_spark(datetime.now())

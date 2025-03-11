@@ -2,9 +2,7 @@ from pyspark.sql import SparkSession
 from pyspark.sql.functions import (
     col, lit, explode
 )
-from datetime import datetime
-
-NOW = datetime.now()
+from datetime import datetime, timedelta
 
 BUCKET = "wt-grepp-lake"
 PLATFORM = "naver"
@@ -18,6 +16,11 @@ def get_comments(spark, date):
 
 def get_episode_likes(spark, date):
     url = RAW.format(bucket=BUCKET, platform=PLATFORM, target="episode_likes", target_date=date)
+    return spark.read.json(f"{url}/*/*.json", multiLine=True)
+
+
+def get_episode_info(spark, date):
+    url = RAW.format(bucket=BUCKET, platform=PLATFORM, target="episode_info", target_date=date)
     return spark.read.json(f"{url}/*/*.json", multiLine=True)
 
 
@@ -46,9 +49,8 @@ def get_titles(spark, date, dayInt):
     )
 
 
-def save_to_parquet(df, target):
-    date_str = NOW.strftime("year=%Y/month=%m/day=%d")
-    path = f"s3a://wt-grepp-lake/optimized/{target}/{date_str}/platform={PLATFORM}"
+def save_to_parquet(df, date, target):
+    path = f"s3a://{BUCKET}/optimized/{target}/{date}/platform={PLATFORM}"
     df.coalesce(50).write.format("parquet").mode("append").save(path)
     print(f"Data successfully optimized to {path}")
 
@@ -62,25 +64,39 @@ def create_spark_session():
         .getOrCreate()
 
 
-def run():
+def run_spark(target):
     spark = create_spark_session()
-    date_str = NOW.strftime("%Y/%m/%d")
-    dayInt = NOW.weekday()
+    date_get = target.strftime("%Y/%m/%d")
+    date_save = target.strftime("year=%Y/month=%m/day=%d")
+    dayInt = target.weekday()
 
-    titles_df = get_titles(spark, date_str, dayInt)
-    save_to_parquet(titles_df, "titles")
+    titles_df = get_titles(spark, date_get, dayInt)
+    save_to_parquet(titles_df, date_save, "titles")
 
-    title_info_df = get_title_info(spark, date_str)
-    save_to_parquet(title_info_df, "title_info")
+    title_info_df = get_title_info(spark, date_get)
+    save_to_parquet(title_info_df, date_save, "title_info")
 
-    episodes_df = get_episodes(spark, date_str)
-    save_to_parquet(episodes_df, "episodes")
+    episodes_df = get_episodes(spark, date_get)
+    save_to_parquet(episodes_df, date_save, "episodes")
     
-    episode_likes_df = get_episode_likes(spark, date_str)
-    save_to_parquet(episode_likes_df, "episode_likes")
+    episode_info_df = get_episode_info(spark, date_get)
+    save_to_parquet(episode_info_df, date_save, "episode_info")
+    
+    episode_likes_df = get_episode_likes(spark, date_get)
+    save_to_parquet(episode_likes_df, date_save, "episode_likes")
 
-    comments_df = get_comments(spark, date_str)
-    save_to_parquet(comments_df, "comments")
+    comments_df = get_comments(spark, date_get)
+    save_to_parquet(comments_df, date_save, "comments")
 
 
-run()
+def run_until_today():
+    start_date = datetime(2025, 2, 28) # 프로젝트 시작 날짜
+    end_date = datetime.today() 
+
+    current_date = start_date
+    while current_date < end_date:
+        run_spark(current_date)
+        current_date += timedelta(days=1) 
+
+
+run_spark(datetime.now())
