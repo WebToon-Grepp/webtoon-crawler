@@ -26,7 +26,6 @@ def read_to_parquet(spark, target, date):
             col("content.id").alias("id"), 
             col("content.title").alias("title"), 
             concat_ws(" / ", col("content.authors.name")).alias("author"),
-            col("content.backgroundImage").alias("image_url"), 
             col("content.featuredCharacterImageA").alias("image_url"), 
             col("weekday_str"),
             lit(False).alias("is_completed"),
@@ -182,6 +181,5 @@ def run_until_today():
     while current_date < end_date:
         run_spark(current_date)
         current_date += timedelta(days=1) 
-
 
 run_spark(datetime.now())

@@ -38,22 +38,20 @@ def read_to_parquet(spark, target, date):
             col("title_id"),
             col("article.no").alias("id"),
             col("article.subtitle").alias("title"),
-            col("article.thumbnailUrl").alias("image_url")
+            col("article.thumbnailUrl").alias("image_url"),
+            col("article.serviceDateDescription").alias("start_date")
         )
     elif target == "episode_likes":
         return df.select(
-            col("contents").getItem(0).alias("content"),
-            col("timestamp").alias("start_date")
+            col("contents").getItem(0).alias("content")
         ).select(
             explode(col("content.reactions")).alias("reaction"),
-            col("content.contentsId").alias("contentsId"),
-            col("start_date")
+            col("content.contentsId").alias("contentsId")
         ).select(
             lit(PLATFORM).alias("platform"),
             split(col("contentsId"), "_").getItem(0).alias("title_id"),
             split(col("contentsId"), "_").getItem(1).alias("id"),
-            col("reaction.count").alias("likes"),
-            col("start_date")
+            col("reaction.count").alias("likes")
         )
     elif target == "comments":
         return df.select(
@@ -88,8 +86,7 @@ def convert_weekday(df):
 
 
 def convert_timestamp(df):
-    return df.withColumn("timestamp", from_unixtime(col("start_date") / 1000)) \
-             .withColumn("updated_date", to_date(col("timestamp")))
+    return df.withColumn("updated_date", to_date(col("start_date"), "yy.MM.dd"))
 
 
 def convert_titles(spark, titles, title_info, date):
@@ -107,8 +104,8 @@ def convert_titles(spark, titles, title_info, date):
         FROM title_info_table
     """)
 
-    save_to_parquet(titles_df, "titles", date)
-    save_to_parquet(genres_df, "genres", date)
+    save_to_parquet(titles_df, date, "titles")
+    save_to_parquet(genres_df, date, "genres")
 
 
 def convert_episodes(spark, episodes, episode_likes, comments, date):
@@ -118,7 +115,7 @@ def convert_episodes(spark, episodes, episode_likes, comments, date):
 
     spark.sql("""
         CREATE OR REPLACE TEMP VIEW joined_episodes AS
-        SELECT e.*, el.likes, el.updated_date, c.comments
+        SELECT e.*, el.likes, c.comments
         FROM episodes_table e
         LEFT JOIN episode_likes_table el
             ON e.platform = el.platform
@@ -137,7 +134,7 @@ def convert_episodes(spark, episodes, episode_likes, comments, date):
         WHERE updated_date IS NOT NULL
     """)
 
-    save_to_parquet(joined_episodes_df, "episodes", date)
+    save_to_parquet(joined_episodes_df,  date, "episodes")
 
 
 def create_spark_session():
@@ -162,8 +159,8 @@ def run_spark(target):
 
     print("Data processing to episodes")
     episodes_df = read_to_parquet(spark, "episodes", date_str)
+    episodes_df = convert_timestamp(episodes_df)
     episode_likes_df = read_to_parquet(spark, "episode_likes", date_str)
-    episode_likes_df = convert_timestamp(episode_likes_df)
 
     comments_df = read_to_parquet(spark, "comments", date_str)
     convert_episodes(spark, episodes_df, episode_likes_df, comments_df, date_str)
@@ -177,6 +174,5 @@ def run_until_today():
     while current_date < end_date:
         run_spark(current_date)
         current_date += timedelta(days=1) 
-
 
 run_spark(datetime.now())
