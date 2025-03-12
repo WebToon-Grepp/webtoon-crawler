@@ -2,9 +2,9 @@ import shutil
 import os
 import json
 import requests
+import concurrent.futures
 from datetime import datetime
 from endpoint import KakaoWebtoonEndpoint
-
 
 def clear_folder(platform="kakao"):
     dir_path = os.path.join("output", "raw", platform)
@@ -53,7 +53,7 @@ def fetch_titles_from_url(url, subfolder_name, file_name):
             card_groups = data[0].get("cardGroups", [])
             if card_groups:
                 for content in card_groups[0].get("cards", []):
-                    titles.append(content['content']['id'])
+                    titles.append(content["content"]["id"])
         return titles
     except requests.RequestException as e:
         print(f"Error fetching titles from {url}: {e}")
@@ -87,7 +87,9 @@ def fetch_episodes(title_id, total_count=9999):
         data = json_data.get("data", {})
         if data:
             for episode in data.get("episodes", []):
-                episodes.append(episode['id'])
+                if total_count < 9999 and episode["useType"] != "FREE":
+                    continue
+                episodes.append(episode["id"])
 
         return episodes
     except requests.RequestException as e:
@@ -115,10 +117,12 @@ def fetch_data_for_titles(titles, total_count=9999):
     for title in titles:
         fetch_title_info(title)
         episodes = fetch_episodes(title, total_count)
-        for episode in episodes:
-            fetch_comments(title, episode)
-            fetch_episode_likes(title, episode)
-
+        with concurrent.futures.ThreadPoolExecutor(max_workers=os.cpu_count()) as executor:
+            futures  = []
+            for episode in episodes:
+                futures.append(executor.submit(fetch_comments, title, episode))
+                futures.append(executor.submit(fetch_episode_likes, title, episode))
+            concurrent.futures.wait(futures)
 
 # Airflow Past Data DAG Call Function
 def fetch_all_historical_data():
@@ -137,12 +141,10 @@ def fetch_daily_data(day):
     clear_folder()
 
     titles = fetch_titles(day)
-    fetch_data_for_titles(titles, 3)
+    fetch_data_for_titles(titles, 10)
 
 
 # Main Call Function
 def fetch_all_data():
-    clear_folder()
-
     fetch_daily_data(0)
 

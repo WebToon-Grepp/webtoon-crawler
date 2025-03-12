@@ -2,7 +2,7 @@ from pyspark.sql import SparkSession
 from pyspark.sql.functions import (
     col, explode, split, input_file_name
 )
-from datetime import datetime, timedelta
+from datetime import datetime
 
 BUCKET = "wt-grepp-lake"
 PLATFORM = "kakao"
@@ -34,6 +34,12 @@ def get_title_info(spark, date):
     return spark.read.json(f"{url}/*.json", multiLine=True)
 
 
+def get_finished_titles(spark, date):
+    url = RAW.format(bucket=BUCKET, platform=PLATFORM, target="finished_titles", target_date=date)
+    df = spark.read.json(f"{url}/*.json", multiLine=True)
+    return df.select(explode(col("data")).alias("data"))
+
+
 def get_titles(spark, date):
     url = RAW.format(bucket=BUCKET, platform=PLATFORM, target="titles", target_date=date)
     df = spark.read.json(f"{url}/*.json", multiLine=True)
@@ -63,6 +69,9 @@ def run_spark(target):
     titles_df = get_titles(spark, date_get)
     save_to_parquet(titles_df, date_save, "titles")
 
+    finished_titles_df = get_finished_titles(spark, date_get)
+    save_to_parquet(finished_titles_df, date_save, "finished_titles")
+
     title_info_df = get_title_info(spark, date_get)
     save_to_parquet(title_info_df, date_save, "title_info")
 
@@ -76,14 +85,4 @@ def run_spark(target):
     save_to_parquet(comments_df, date_save, "comments")
 
 
-def run_until_today():
-    start_date = datetime(2025, 2, 28)  
-    end_date = datetime.today() 
-
-    current_date = start_date
-    while current_date < end_date:
-        run_spark(current_date)
-        current_date += timedelta(days=1) 
-
-
-run_spark(datetime.now())
+run_spark(datetime(2025, 2, 27))
