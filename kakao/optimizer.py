@@ -42,7 +42,7 @@ def get_titles(spark, date):
 
 def save_to_parquet(df, date, target):
     path = f"s3a://{BUCKET}/optimized/{target}/{date}/platform={PLATFORM}"
-    df.coalesce(50).write.format("parquet").mode("append").save(path)
+    df.coalesce(10).write.format("parquet").mode("append").save(path)
     print(f"Data successfully optimized to {path}")
 
 
